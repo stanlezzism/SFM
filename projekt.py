@@ -4,6 +4,7 @@ from os import *
 from os.path import *
 from shutil import *
 from papier import *
+from tkinter import filedialog
 
 del globals()['open']
 
@@ -33,10 +34,12 @@ class Okno(object):
         najdi = Button(self.okno, command = self.najdi, width = 50, text = 'Nájdi')
         self.reset = Button(self.okno, command = self.reset_metoda, width = 50, text = 'Reset', state = DISABLED)
         self.pridaj_entry = Button(self.okno, command = self.pridaj_entry_metoda, width = 4, text = ' + ', state = DISABLED)
+        self.reset_config = Button(self.okno, command = self.reset_config_metoda, text = 'Iný priečinok', state = DISABLED)
+        self.reset_config.place(x = 265, y = 175)
         najdi.place(x = 265, y = 225)
         self.reset.place(x = 265, y = 200)
         self.pridaj_entry.place(x = 207, y = 120)
-        self.buttony.extend([self.premenuj, self.zapamataj, najdi, self.pridaj_entry, self.reset])
+        self.buttony.extend([self.premenuj, self.zapamataj, najdi, self.pridaj_entry, self.reset, self.reset_config])
 
         ## entries
         self.uz_navyse = False
@@ -191,9 +194,30 @@ class Okno(object):
     def reset_metoda(self):
         for i in range(len(self.subory)):
             self.subory.pop()
+        self.reset_config_metoda()
+        self.reset_config_metoda()
+        self.scrollbar.pack_forget()
+        self.listbox.pack_forget()
+        self.premenuj.place_forget()
+        self.zapamataj.place_forget()
         self.najdi()
+
+    def reset_config_metoda(self):
+        tf = open('config.txt', 'w+')
+        tf.write('0')
+        tf.close()
+        self.konfiguracia = '0';
+        if len(self.subory) == 0:            
+            self.reset['state'] = DISABLED
+            for radio in self.radia:
+                radio['state'] = DISABLED
+            self.zapamataj['state'] = DISABLED
+            self.premenuj['state'] = DISABLED
+        else:
+            self.najdi()
     
     def najdi(self):
+        self.radia[0].invoke()
         self.listbox_update()
         if self.konfiguracia == '0':
             directory = filedialog.askdirectory()
@@ -203,7 +227,7 @@ class Okno(object):
             if self.directory == '' or pot_directory == '':
                 self.zaporna_hlaska('Nezadali ste cestu k priečinku. Prosím skúste znova.')
                 return
-            tf = open('config.txt', 'w')
+            tf = open('config.txt', 'w+')
             tf.write('1\n')
             tf.write(self.directory)
             tf.close()
@@ -212,16 +236,26 @@ class Okno(object):
             tf.readline()
             self.directory = tf.readline()
             tf.close()
-        self.neutralna_hlaska(self.directory)
         self.nacitaj_subory(self.directory)
+        if len(self.subory) == 0:
+            self.zaporna_hlaska('Nepodarilo sa načítať žiadne súbory.')
+            self.reset_config_metoda()
+            self.scrollbar.pack_forget()
+            self.listbox.pack_forget()
+            self.premenuj.place_forget()
+            self.zapamataj.place_forget()
+            return
+        self.neutralna_hlaska(self.directory)
         self.scrollbar.pack(side = RIGHT, fill = Y)
         self.listbox.pack()
         self.premenuj.place(x = 425, y = 495)
         self.zapamataj.place(x = 265, y = 495)
         self.reset['state'] = NORMAL
+        self.premenuj['state'] = NORMAL
+        self.zapamataj['state'] = NORMAL
+        self.reset_config['state'] = NORMAL
         for radio in self.radia:
-            radio['state'] = NORMAL
-        
+            radio['state'] = NORMAL   
 
     def entry_creation(self):
         next_entry = Entry(self.okno, width = 30)
@@ -261,10 +295,13 @@ class Okno(object):
             self.okno.minsize(height = 600, width = 613)
 
     def nacitaj_subory(self, path):
+        if len(self.subory) != 0:
+            del self.subory
+            self.subory = []
         for subor in listdir(path):
             if isfile(join(path, subor)):
                 if subor.startswith('00'):
-                    if 'txt' not in join(path, subor):
+                    if '.pdf' not in join(path, subor):
                         pass
                     else:
                         self.subory.append(Papier(subor, self.var.get(), join(path, subor)))
@@ -283,7 +320,6 @@ class Okno(object):
                 index = self.last_index
             self.last_index = index
             if self.radio_value() == 1 or self.radio_value() == 8:
-                print(self.subory[int(index)].typ)
                 self.pridaj_entry['state'] == DISABLED
             else:
                 self.pridaj_entry['state'] == NORMAL
@@ -324,14 +360,14 @@ class Okno(object):
         for i in range(len(self.subory)):
             meno = self.meno.get().replace(' ', '_')
             if self.subory[i].typ == 'WK':                  
-                novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_wk+1) + ')' + '.txt'
+                novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_wk+1) + ')' + '.pdf'
                 last_wk+=1
                 rename(self.subory[i].cesta, join(self.directory, novy_nazov))
                 continue
             if self.subory[i].typ == 'PREVOD':
                 for j in range(len(self.subory[i].cisla)):
                     copy2(self.subory[i].cesta, appdata_loc)
-                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[j]+ '_' + meno + '.txt'
+                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[j]+ '_' + meno + '.pdf'
                     rename(join(appdata_loc, self.subory[i].nazov), join(appdata_loc, novy_nazov))
                     copy2(join(appdata_loc, novy_nazov), self.directory)
                 remove(self.subory[i].cesta)
@@ -341,23 +377,23 @@ class Okno(object):
                 continue
             if self.subory[i].typ == 'OP' or self.subory[i].typ == 'TP' or self.subory[i].typ == 'CP' or self.subory[i].typ == 'VP':
                 if self.subory[i].typ == 'OP':
-                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_op+1) +')'+ '.txt'
+                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_op+1) +')'+ '.pdf'
                     last_op+=1
                 elif self.subory[i].typ == 'TP':
-                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_tp+1) +')'+ '.txt'
+                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_tp+1) +')'+ '.pdf'
                     last_tp+=1
                 elif self.subory[i].typ == 'CP':
-                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_cp+1) +')'+ '.txt'
+                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_cp+1) +')'+ '.pdf'
                     last_cp+=1
                 elif self.subory[i].typ == 'VP':
-                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_vp+1) +')'+ '.txt'
+                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[0] + '_'+ meno+ ' ('+ str(last_vp+1) +')'+ '.pdf'
                     last_vp+=1
                 rename(self.subory[i].cesta, join(self.directory, novy_nazov))
                 continue
             if self.subory[i].typ == 'PZ':
                 for j in range(len(self.subory[i].cisla)):
                     copy2(self.subory[i].cesta, appdata_loc)
-                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[j]+ '_' + meno + ' (' + str(last_pz+1) + ')'+ '.txt'
+                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + list(self.subory[i].cisla)[j]+ '_' + meno + ' (' + str(last_pz+1) + ')'+ '.pdf'
                     rename(join(appdata_loc, self.subory[i].nazov), join(appdata_loc, novy_nazov))
                     copy2(join(appdata_loc, novy_nazov), self.directory)
                     last_pz+=1
@@ -367,18 +403,18 @@ class Okno(object):
                         remove(join(appdata_loc, subor))
                 continue
             if self.subory[i].typ == 'EXC':                  
-                novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_exc+1) + ')' + '.txt'
+                novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_exc+1) + ')' + '.pdf'
                 last_exc+=1
                 rename(self.subory[i].cesta, join(self.directory, novy_nazov))
                 continue
             if self.subory[i].typ == 'WH':
                 if len(self.subory[i].cisla) == 0:
-                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_wh+1) + ')' + '.txt'
+                    novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_wh+1) + ')' + '.pdf'
                     last_wh+=1
                     rename(self.subory[i].cesta, join(self.directory, novy_nazov))
                 else:
                     for j in range(len(self.subory[i].cisla)):
-                        novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_wh+1) + ')' + '.txt'
+                        novy_nazov = self.rc_ico.get() + '_' + self.subory[i].typ + '_' + meno + ' (' + str(last_wh+1) + ')' + '.pdf'
                         last_wh+=1
                         rename(self.subory[i].cesta, join(self.directory, novy_nazov))
                 continue
